@@ -11,7 +11,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to server via SSH
+      - name: Deploy to server
         env:
           HOST: ${{ secrets.SERVER_HOST }}
           USER: ${{ secrets.SERVER_USER }}
@@ -20,35 +20,14 @@ jobs:
           echo "$SSH_KEY" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
           
-          # Find the main index.html directory (07-Omnifood-Desktop or latest version)
-          INDEX_DIR=$(ls -d 07-* 2>/dev/null | head -1 || echo ".")
+          # Find the project folder (07-Omnifood-Desktop)
+          INDEX_DIR=$(ls -d 07-* 2>/dev/null | head -1)
           
-          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $USER@$HOST "
-            rm -rf /var/www/omnifood/*
-            rsync -az --delete -e 'ssh -i /tmp/deploy_key' /tmp/build/ /var/www/omnifood/
-          " || (
-            # Fallback: scp via tar
-            tar czf - -C "$GITHUB_WORKSPACE" . | ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $USER@$HOST "
-              mkdir -p /var/www/omnifood
-              tar xzf - -C /var/www/omnifood
-            "
-          )
-
-      - name: Sync files
-        env:
-          HOST: ${{ secrets.SERVER_HOST }}
-          USER: ${{ secrets.SERVER_USER }}
-          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
-          WORKDIR: ${{ github.workspace }}
-        run: |
-          echo "$SSH_KEY" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
+          # Create tar and send to server via SSH
+          tar czf - -C "./${INDEX_DIR}" . | ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $USER@$HOST "
+            mkdir -p /var/www/omnifood
+            tar xzf - -C /var/www/omnifood
+            echo 'Deploy completed'
+          "
           
-          # Get index directory
-          INDEX_DIR=$(ls -d 07-* 2>/dev/null | head -1 || echo ".")
-          
-          # rsync to server
-          rsync -avz --delete \
-            -e "ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key" \
-            "./${INDEX_DIR}/" \
-            "$USER@$HOST:/var/www/omnifood/"
+          echo "=== Deployment done ==="
