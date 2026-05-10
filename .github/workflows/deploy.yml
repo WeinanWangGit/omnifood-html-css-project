@@ -11,6 +11,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install rsync
+        run: sudo apt-get update && sudo apt-get install -y rsync
+
       - name: Deploy to server
         env:
           HOST: ${{ secrets.SERVER_HOST }}
@@ -22,12 +25,12 @@ jobs:
           
           # Find the project folder (07-Omnifood-Desktop)
           INDEX_DIR=$(ls -d 07-* 2>/dev/null | head -1)
+          echo "Deploying from: $INDEX_DIR"
           
-          # Create tar and send to server via SSH
-          tar czf - -C "./${INDEX_DIR}" . | ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $USER@$HOST "
-            mkdir -p /var/www/omnifood
-            tar xzf - -C /var/www/omnifood
-            echo 'Deploy completed'
-          "
+          # Use rsync to sync files
+          rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key" \
+            "./${INDEX_DIR}/" \
+            "$USER@$HOST:/var/www/omnifood/"
           
           echo "=== Deployment done ==="
