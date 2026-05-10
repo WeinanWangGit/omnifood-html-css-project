@@ -7,14 +7,23 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install rsync
-        run: sudo apt-get update && sudo apt-get install -y rsync
+      - name: Test SSH connection
+        env:
+          HOST: ${{ secrets.SERVER_HOST }}
+          USER: ${{ secrets.SERVER_USER }}
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          echo "$SSH_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i /tmp/deploy_key $USER@$HOST "echo 'SSH OK' && ls /var/www/omnifood"
 
-      - name: Deploy to server
+      - name: Deploy static files
         env:
           HOST: ${{ secrets.SERVER_HOST }}
           USER: ${{ secrets.SERVER_USER }}
@@ -23,14 +32,12 @@ jobs:
           echo "$SSH_KEY" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
           
-          # Find the project folder (07-Omnifood-Desktop)
           INDEX_DIR=$(ls -d 07-* 2>/dev/null | head -1)
-          echo "Deploying from: $INDEX_DIR"
+          echo "Using directory: $INDEX_DIR"
           
-          # Use rsync to sync files
-          rsync -avz --delete \
+          rsync -avz \
             -e "ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key" \
             "./${INDEX_DIR}/" \
             "$USER@$HOST:/var/www/omnifood/"
           
-          echo "=== Deployment done ==="
+          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key $USER@$HOST "ls -la /var/www/omnifood/"
